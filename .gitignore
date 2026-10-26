@@ -1,0 +1,23 @@
+# Data: never commit (licence + size)
+data/**
+!data/**/.gitkeep
+*.DAT
+*.dat
+*.zip
+*.parquet
+*.csv
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Secrets
+.env
