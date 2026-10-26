@@ -21,3 +21,6 @@ derby.log
 
 # Secrets
 .env
+
+# macOS
+.DS_Store

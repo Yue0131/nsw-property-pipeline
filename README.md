@@ -6,8 +6,10 @@
 <!-- What question does this answer, and why does it need a pipeline rather than a one-off notebook? -->
 
 ## Data
-- Source: NSW Valuer General, Bulk Property Sales Information (weekly `.DAT` files, 1990 onwards).
-- Licence: see the NSW Government property sales information page. Used here for non-commercial, educational purposes. **No raw or processed data is stored in this repository.**
+- Source: NSW Valuer General, [Bulk Property Sales Information](https://valuation.property.nsw.gov.au/embed/propertySalesInformation) (weekly `.DAT` files per Local Government Area, 2001 onwards; yearly files 1990–2001).
+- Licence: [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/), as stated on the official page (checked 2026-10-26). Used here for non-commercial, educational purposes only.
+- **No raw or processed data is stored in this repository.** Run the pipeline locally to reproduce results.
+- © State of New South Wales through the NSW Valuer General. The Valuer General does not guarantee the completeness or accuracy of the data.
 
 ## Architecture
 <!-- Diagram: raw → bronze → silver → gold, with what happens at each layer. -->
