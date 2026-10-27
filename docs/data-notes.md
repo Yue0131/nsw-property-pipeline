@@ -111,14 +111,58 @@ The parser must not assume the field count in the guide.
 The Z counts give a free quality check: counted rows must equal the trailer.
 
 ## Data problems found during exploration
-- [x] Is the 3-digit file name code the district code? Yes, matches the A record (file 043).
-- [x] Do B, C, D link on their first fields? Yes: district + property id + sale counter (guide).
-- [x] One B had two D lines (P and V): yes, one-to-many, one per party.
-- [ ] Z trailer present in every file? Check with `tail -1` on several files.
-- [ ] Does the same sale (same dealing number) appear in more than one weekly file?
-- [ ] Guide types disagree between records (property id A vs N; property name N). Store ids as strings.
-- [ ] D records have more fields than the guide lists.
-- [ ] Primary purpose filled when nature = R, not only when nature = 3.
-- [ ] Meaning of NNME, component code, sale code: not in this guide (check Data Elements / user guide).
-- [ ] Licence: the guide's own footer says "Creative Commons Attribution 4.0" but links to by-nd/4.0/au.
-      A third conflicting statement; see decisions.md.
+Sample: 4 weekly files (20260928, 20261005, 20261012, 20261019), 14,069 B records.
+
+### Structure
+- [x] The 3-digit file name prefix is the district code (matches the A record).
+- [x] B, C, D link on (district_code, property_id, sale_counter) within one file.
+- [x] One sale can have several D records (e.g. 1 P + 2 V).
+- [x] Z trailer counts reconcile with parsed rows (week 20261019: 3,199 = 3,199).
+- [ ] Z trailer present in every file of every week (checked on one week only).
+- [ ] D records have 5 more empty fields than the guide lists.
+
+### Volume
+- B records per week: 3,621 / 4,297 / 2,952 / 3,199. Weekly volume varies by ~±20%.
+
+### Missing values (week 20261019; empty or whitespace = missing)
+- sale_code 100% empty: field not populated.
+- pct_interest 99.2% empty (= 100% interest); ~0.8% are partial-interest sales.
+- unit_number 66.3%, strata_lot_number 60.3%: expected, strata/unit only.
+- zoning and component_code both 45.6%: same rate, check if always missing together.
+- area and area_type both 20.8%: missing as a pair.
+- post_code 1.5%, locality 0.1%.
+- property_id 0.1% missing although required.
+- contract_date: 3 of 14,069 empty although required.
+
+### Multi-property sales
+- [x] One dealing can cover several properties. Week 20261019: 96 dealing_numbers span 220 B rows.
+- [x] In all 96, every row repeats the **total** sale price. Counting rows overstates volume
+      (3,199 rows vs 3,075 dealings) and per-row prices are not per-property prices.
+
+### Duplicates across weeks
+- [x] 13,698 distinct dealing_numbers; 35 (0.26%) appear in two weeks, none in three or more.
+- [x] The repeated records are identical (no field differs apart from download_datetime,
+      sale_counter and file/week). They are re-publications, not corrections.
+
+### Prices (week 20261019)
+- No zero, negative or unparseable prices.
+- Median $921,000 vs mean $1,497,955: right-skewed, so use the median.
+- 6 below $10,000: 5 are rural vacant land (plausible), 1 residence (likely nominal transfer).
+- 40 above $10,000,000: mostly nature_of_property = 3 (commercial, farm); residences are in
+  high-value suburbs.
+
+### Dates (4 weeks)
+- Contract → settlement gap: median 42 days, IQR 35–79 days. No settlement before contract.
+- 987 records (7%) have a gap over 365 days.
+- Contract year: 2026 = 12,417 (88%), 2025 = 871, 2024 = 328, 2023 = 182, 2022 = 147,
+  2021 = 103, a handful 2006–2020, and 1926 and 1976 (almost certainly errors).
+- Weekly files contain sales contracted months or years earlier: **late-arriving data**.
+
+### Formats
+- house_number can contain a space (e.g. "52 A"), unlike the guide's example "A125B".
+- primary_purpose is almost always filled, not only when nature_of_property = 3.
+- Dealing numbers in this sample start with a letter prefix (e.g. "AV"). Meaning: TBC.
+- area_type mixes M (square metres) and H (hectares); convert before comparing areas.
+
+### Still unknown
+- [ ] Meaning of NNME, component_code, sale_code, the dealing number prefix.

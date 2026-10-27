@@ -24,3 +24,6 @@ derby.log
 
 # macOS
 .DS_Store
+
+# Personal notes (local only)
+CLAUDE.md
