@@ -1,6 +1,6 @@
 from datetime import date
 
-from pipeline.silver import type_sales
+from pipeline.silver import SALE_KEY, enrich_sales, legal_descriptions, party_counts, type_sales
 
 COLUMNS = ["contract_date", "settlement_date", "purchase_price",
            "area", "area_type", "pct_interest", "post_code"]
@@ -27,3 +27,29 @@ def test_bad_or_blank_values_become_null(spark):
     assert row.settlement_date is None
     assert row.purchase_price is None
     assert row.area_sqm is None
+
+KEY = ("f1", "999", "1000001", "1")
+C_SCHEMA = ("source_file string, district_code string, property_id string, "
+            "sale_counter string, record_index long, legal_description string")
+D_SCHEMA = ("source_file string, district_code string, property_id string, "
+            "sale_counter string, purchaser_vendor string")
+
+
+def test_legal_description_joined_in_file_order(spark):
+    c = spark.createDataFrame([(*KEY, 1, "3456"), (*KEY, 0, "LOT 1 DP 12")], C_SCHEMA)
+    assert legal_descriptions(c).first().legal_description == "LOT 1 DP 123456"
+
+
+def test_party_counts(spark):
+    d = spark.createDataFrame([(*KEY, "P"), (*KEY, "V"), (*KEY, "V")], D_SCHEMA)
+    row = party_counts(d).first()
+    assert (row.purchaser_count, row.vendor_count) == (1, 2)
+
+
+def test_sale_without_c_or_d_is_kept(spark):
+    b = spark.createDataFrame([KEY], SALE_KEY)
+    c = spark.createDataFrame([], C_SCHEMA)
+    d = spark.createDataFrame([], D_SCHEMA)
+    rows = enrich_sales(b, c, d).collect()
+    assert len(rows) == 1
+    assert rows[0].legal_description is None

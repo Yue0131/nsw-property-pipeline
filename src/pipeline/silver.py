@@ -25,3 +25,31 @@ def type_sales(df: DataFrame) -> DataFrame:
         )
         .withColumn("pct_interest", F.coalesce(F.col("pct_interest").cast("int"), F.lit(100)))
     )
+
+
+SALE_KEY = ["source_file", "district_code", "property_id", "sale_counter"]
+
+
+def legal_descriptions(c: DataFrame) -> DataFrame:
+    """Join each sale's C records into one legal description, in file order."""
+    ordered = F.sort_array(F.collect_list(F.struct("record_index", "legal_description")))
+    return c.groupBy(SALE_KEY).agg(
+        F.concat_ws("", F.transform(ordered, lambda x: x["legal_description"]))
+        .alias("legal_description")
+    )
+
+
+def party_counts(d: DataFrame) -> DataFrame:
+    """Count purchasers and vendors per sale."""
+    return d.groupBy(SALE_KEY).agg(
+        F.sum(F.when(F.col("purchaser_vendor") == "P", 1).otherwise(0)).alias("purchaser_count"),
+        F.sum(F.when(F.col("purchaser_vendor") == "V", 1).otherwise(0)).alias("vendor_count"),
+    )
+
+
+def enrich_sales(b: DataFrame, c: DataFrame, d: DataFrame) -> DataFrame:
+    """Attach legal description and party counts to each sale. Left joins keep every sale."""
+    return (
+        b.join(legal_descriptions(c), SALE_KEY, "left")
+        .join(party_counts(d), SALE_KEY, "left")
+    )
