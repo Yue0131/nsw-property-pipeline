@@ -30,3 +30,5 @@ CLAUDE.md
 
 # Made-up test fixtures are allowed
 !tests/fixtures/*.DAT
+
+.vscode/
