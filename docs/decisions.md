@@ -40,3 +40,30 @@ One entry per decision. Keep each short.
   (3) Recompute only the quarters present in the new data.
 - **Decision:** Option 3 for incremental runs; option 2 for a full backfill.
 - **Why / trade-offs:** Past quarters stay correct as late sales arrive, without reprocessing all of history each week. Published past-quarter numbers can change, so the README should say so.
+
+## 2026-10-28 — Bronze storage: Parquet, all columns as strings
+- **Context:** Raw .DAT files are text. Later layers need fast, typed reads.
+- **Options:** (1) Keep the .DAT text. (2) CSV. (3) Parquet.
+- **Decision:** Parquet, with every column kept as a string in bronze.
+- **Why / trade-offs:** Parquet is columnar, compressed and read natively by Spark.
+  Strings keep bronze a faithful copy of the source (e.g. leading zeros in codes);
+  type casting and validation happen in silver.
+
+## 2026-10-28 — Bronze layout: one folder per record type, one file per source file
+- **Decision:** `data/bronze/record_type=X/FILE_STEM.parquet` (X = A, B, C, D or Z;
+  FILE_STEM = source file name without .DAT), with lineage columns `source_file` and
+  `ingested_at` (UTC) on every row.
+- **Why / trade-offs:** Record types have different columns, so they are separate tables.
+  The Hive-style folder name lets Spark read `record_type` as a column. One output path
+  per source file means a re-run overwrites instead of duplicating.
+
+## 2026-10-28 — Incremental loads: manifest keyed on file name + SHA-256
+- **Context:** New weekly files arrive, and a file could be republished with corrections
+  under the same name.
+- **Options:** (1) Reprocess everything each run. (2) Skip files by name. (3) Skip files by
+  name + content hash.
+- **Decision:** Option 3. `data/bronze/_manifest.csv` records source_file, sha256,
+  ingested_at and b_rows.
+- **Why / trade-offs:** Unchanged files are skipped; a corrected file has a new hash and is
+  reprocessed. Hashing reads each file once per run, which is cheap at this size.
+  Verified on 4 real weeks: 500 files, 14,069 B rows, second run ingests 0.
