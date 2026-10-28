@@ -27,3 +27,6 @@ derby.log
 
 # Personal notes (local only)
 CLAUDE.md
+
+# Made-up test fixtures are allowed
+!tests/fixtures/*.DAT
