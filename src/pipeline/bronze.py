@@ -18,6 +18,7 @@ def write_bronze(path: Path, bronze_dir: Path, ingested_at: str) -> dict[str, in
     for record_type, df in parse_file(path).items():
         df["source_file"] = path.name
         df["ingested_at"] = ingested_at
+        df["record_index"] = range(len(df))
         out = bronze_dir / f"record_type={record_type}" / f"{path.stem}.parquet"
         out.parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(out, index=False)

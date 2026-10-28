@@ -57,3 +57,9 @@ def test_rewriting_a_file_gives_same_bronze(tmp_path):
     assert sorted(tmp_path.rglob("*.parquet")) == files_before
     pd.testing.assert_frame_equal(
         pd.read_parquet(tmp_path / "record_type=B" / f"{FIXTURE.stem}.parquet"), b_before)
+
+def test_bronze_keeps_file_order(tmp_path):
+    write_bronze(FIXTURE, tmp_path, INGESTED_AT)
+    c = pd.read_parquet(tmp_path / "record_type=C" / f"{FIXTURE.stem}.parquet")
+    assert list(c["record_index"]) == [0, 1, 2, 3]
+    assert list(c["legal_description"][:2]) == ["LOT 1 DP 12", "3456"]
