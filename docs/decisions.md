@@ -29,10 +29,16 @@ One entry per decision. Keep each short.
 - **Decision:** Gold median price uses dealings with exactly one property, nature_of_property = R, and full interest (pct_interest empty). Volume counts all dealings.
 - **Why / trade-offs:** The median reflects ordinary home prices. Excluded sales are still counted in volume and reported, not deleted.
 
-## 2026-10-27 — Deduplication key: (dealing_number, property_id), keep latest
-- **Context:** 35 of 13,698 dealings (0.26%) appear in two weekly files. All repeats were identical. dealing_number alone is not unique per row because of multi-property sales.
-- **Decision:** Key = (dealing_number, property_id). When a key appears more than once, keep the record from the latest weekly file. Rows with a missing key field go to quarantine.
-- **Why / trade-offs:** "Keep latest" is correct whether repeats are identical or corrections. Only 4 weeks were checked, so revisit with more history.
+## 2026-10-27 (revised 2026-10-30) — Deduplication key: (dealing_number, property_id, strata_lot_number), keep latest
+- **Context:** Some dealings appear in two weekly files. Strata lots sold in one dealing share
+  the same property_id and differ only by strata_lot_number (e.g. 7 units of one strata plan).
+- **First attempt:** key (dealing_number, property_id) removed 221 rows on real data. 186 of
+  them were distinct strata lots, not duplicates. unit_number is not reliable (two lots can
+  share a unit number), so strata_lot_number is used.
+- **Decision:** Key = (dealing_number, property_id, strata_lot_number). Keep the row with the
+  latest download_datetime; ties broken by source_file. Rows with a missing key go to quarantine.
+- **Result on 4 weeks:** 43 rows removed: 35 cross-week repeats and 8 exact duplicates inside
+  one file (same sale written twice with different sale_counter). All 43 were identical rows.
 
 ## 2026-10-27 — Recompute every quarter touched by a new file
 - **Context:** About 12% of a week's records have a contract date in an earlier year (late-arriving data).
@@ -67,3 +73,17 @@ One entry per decision. Keep each short.
 - **Why / trade-offs:** Unchanged files are skipped; a corrected file has a new hash and is
   reprocessed. Hashing reads each file once per run, which is cheap at this size.
   Verified on 4 real weeks: 500 files, 14,069 B rows, second run ingests 0.
+
+## 2026-10-30 — Silver: quarantine instead of delete
+- **Decision:** Rows that break a hard rule (missing key or contract date, contract before
+  2001, settlement before contract, price missing or not positive) are written to
+  `data/silver/quarantine` with a `failed_rules` list. Suspicious but possible values
+  (price under $10k, settlement over 365 days) stay in silver.
+- **Why / trade-offs:** Bad rows stay traceable and countable, and can be reprocessed if a
+  rule changes. Check on 4 weeks: 14,069 = 13,984 silver + 42 quarantined + 43 duplicates.
+
+## 2026-10-30 — Silver: full rebuild, partitioned by contract year
+- **Decision:** Silver is rebuilt from all bronze on every run (`mode("overwrite")`) and
+  partitioned by `contract_year`.
+- **Why / trade-offs:** At ~14k rows a full rebuild takes seconds and is idempotent by design.
+  Deduplication needs all weeks together anyway. Revisit if data grows to many years.
