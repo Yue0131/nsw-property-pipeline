@@ -1,6 +1,6 @@
 from datetime import date
 
-from pipeline.silver import SALE_KEY, enrich_sales, legal_descriptions, party_counts, type_sales
+from pipeline.silver import SALE_KEY, enrich_sales, legal_descriptions, party_counts, split_quality, type_sales
 
 COLUMNS = ["contract_date", "settlement_date", "purchase_price",
            "area", "area_type", "pct_interest", "post_code"]
@@ -53,3 +53,28 @@ def test_sale_without_c_or_d_is_kept(spark):
     rows = enrich_sales(b, c, d).collect()
     assert len(rows) == 1
     assert rows[0].legal_description is None
+
+Q_SCHEMA = ("dealing_number string, property_id string, contract_date date, "
+            "settlement_date date, purchase_price long")
+GOOD_ROW = ("AV1", "1", date(2026, 1, 1), date(2026, 2, 1), 500000)
+BAD_ROW = (None, "2", date(1926, 1, 1), date(1925, 1, 1), 0)
+
+
+def test_clean_row_passes(spark):
+    good, bad = split_quality(spark.createDataFrame([GOOD_ROW], Q_SCHEMA))
+    assert (good.count(), bad.count()) == (1, 0)
+
+
+def test_bad_row_lists_every_failed_rule(spark):
+    good, bad = split_quality(spark.createDataFrame([BAD_ROW], Q_SCHEMA))
+    assert good.count() == 0
+    assert sorted(bad.first().failed_rules) == [
+        "contract_before_2001", "missing_dealing_number",
+        "price_not_positive", "settlement_before_contract",
+    ]
+
+
+def test_no_row_is_lost(spark):
+    df = spark.createDataFrame([GOOD_ROW, BAD_ROW, GOOD_ROW], Q_SCHEMA)
+    good, bad = split_quality(df)
+    assert good.count() + bad.count() == df.count()

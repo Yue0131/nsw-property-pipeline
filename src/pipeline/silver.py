@@ -53,3 +53,25 @@ def enrich_sales(b: DataFrame, c: DataFrame, d: DataFrame) -> DataFrame:
         b.join(legal_descriptions(c), SALE_KEY, "left")
         .join(party_counts(d), SALE_KEY, "left")
     )
+
+def quality_rules() -> dict:
+    """Rule name -> condition that is true when a row breaks the rule."""
+    return {
+        "missing_dealing_number": F.col("dealing_number").isNull(),
+        "missing_property_id": F.col("property_id").isNull(),
+        "missing_contract_date": F.col("contract_date").isNull(),
+        "contract_before_2001": F.col("contract_date") < F.lit("2001-01-01").cast("date"),
+        "settlement_before_contract": F.col("settlement_date") < F.col("contract_date"),
+        "price_not_positive": F.col("purchase_price").isNull() | (F.col("purchase_price") <= 0),
+    }
+
+
+def split_quality(df: DataFrame) -> tuple[DataFrame, DataFrame]:
+    """Return (good rows, quarantined rows). Quarantined rows list every rule they failed."""
+    failed = F.array_compact(F.array(*[
+         F.when(condition, F.lit(name)) for name, condition in quality_rules().items()
+    ]))
+    df = df.withColumn("failed_rules", failed)
+    good = df.filter(F.size("failed_rules") == 0).drop("failed_rules")
+    bad = df.filter(F.size("failed_rules") > 0)
+    return good, bad
