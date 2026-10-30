@@ -77,8 +77,8 @@ def split_quality(df: DataFrame) -> tuple[DataFrame, DataFrame]:
     return good, bad
 
 def dedupe_sales(df: DataFrame) -> DataFrame:
-    """Keep one row per (dealing_number, property_id): the one from the latest download."""
-    latest_first = Window.partitionBy("dealing_number", "property_id").orderBy(
+    """Keep one row per (dealing_number, property_id, strata_lot_number): the latest download."""
+    latest_first = Window.partitionBy("dealing_number", "property_id", "strata_lot_number").orderBy(
         F.col("download_datetime").desc(), F.col("source_file").desc()
     )
     return (

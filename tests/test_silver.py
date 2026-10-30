@@ -80,14 +80,14 @@ def test_no_row_is_lost(spark):
     assert good.count() + bad.count() == df.count()
 
 
-DEDUP_SCHEMA = ("dealing_number string, property_id string, download_datetime string, "
-                "source_file string, purchase_price long")
+DEDUP_SCHEMA = ("dealing_number string, property_id string, strata_lot_number string, "
+                "download_datetime string, source_file string, purchase_price long")
 
 
 def test_latest_download_wins(spark):
     df = spark.createDataFrame([
-        ("AV1", "1", "20261005 01:00", "a.DAT", 500000),
-        ("AV1", "1", "20261012 01:00", "b.DAT", 510000),
+        ("AV1", "1", None, "20261005 01:00", "a.DAT", 500000),
+        ("AV1", "1", None, "20261012 01:00", "b.DAT", 510000),
     ], DEDUP_SCHEMA)
     rows = dedupe_sales(df).collect()
     assert len(rows) == 1
@@ -96,15 +96,23 @@ def test_latest_download_wins(spark):
 
 def test_properties_in_same_dealing_are_kept(spark):
     df = spark.createDataFrame([
-        ("AV1", "1", "20261005 01:00", "a.DAT", 900000),
-        ("AV1", "2", "20261005 01:00", "a.DAT", 900000),
+        ("AV1", "1", None, "20261005 01:00", "a.DAT", 900000),
+        ("AV1", "2", None, "20261005 01:00", "a.DAT", 900000),
+    ], DEDUP_SCHEMA)
+    assert dedupe_sales(df).count() == 2
+
+
+def test_strata_lots_of_same_property_are_kept(spark):
+    df = spark.createDataFrame([
+        ("AV1", "1", "1", "20261005 01:00", "a.DAT", 900000),
+        ("AV1", "1", "2", "20261005 01:00", "a.DAT", 900000),
     ], DEDUP_SCHEMA)
     assert dedupe_sales(df).count() == 2
 
 
 def test_tie_is_broken_by_source_file(spark):
     df = spark.createDataFrame([
-        ("AV1", "1", "20261005 01:00", "a.DAT", 1),
-        ("AV1", "1", "20261005 01:00", "b.DAT", 2),
+        ("AV1", "1", None, "20261005 01:00", "a.DAT", 1),
+        ("AV1", "1", None, "20261005 01:00", "b.DAT", 2),
     ], DEDUP_SCHEMA)
     assert dedupe_sales(df).first().source_file == "b.DAT"
