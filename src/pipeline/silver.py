@@ -1,6 +1,6 @@
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-
+from pyspark.sql import Window
 
 def blank_to_null(df: DataFrame) -> DataFrame:
     """Trim every column and turn empty strings into nulls."""
@@ -75,3 +75,14 @@ def split_quality(df: DataFrame) -> tuple[DataFrame, DataFrame]:
     good = df.filter(F.size("failed_rules") == 0).drop("failed_rules")
     bad = df.filter(F.size("failed_rules") > 0)
     return good, bad
+
+def dedupe_sales(df: DataFrame) -> DataFrame:
+    """Keep one row per (dealing_number, property_id): the one from the latest download."""
+    latest_first = Window.partitionBy("dealing_number", "property_id").orderBy(
+        F.col("download_datetime").desc(), F.col("source_file").desc()
+    )
+    return (
+        df.withColumn("_rank", F.row_number().over(latest_first))
+        .filter(F.col("_rank") == 1)
+        .drop("_rank")
+    )
