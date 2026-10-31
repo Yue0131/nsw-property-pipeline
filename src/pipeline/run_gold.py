@@ -20,13 +20,13 @@ def read_processed() -> set[tuple[str, str]]:
     return set(zip(df["source_file"], df["ingested_at"]))
 
 
-def main() -> None:
+def main() -> dict:
     spark = get_spark()
     sales = spark.read.parquet(str(SILVER_DIR))
     quarters = quarters_to_refresh(sales, read_processed())
     if not quarters:
         print("No new loads. Gold is up to date.")
-        return
+        return {"quarters_refreshed": []}
 
     dealings = to_dealings(sales).filter(F.col("contract_quarter").isin(quarters))
     (suburb_quarter_metrics(dealings).write.mode("overwrite")
@@ -39,9 +39,13 @@ def main() -> None:
     pd.DataFrame(loads).to_csv(PROCESSED_PATH, index=False)
 
     gold = spark.read.parquet(str(METRICS_DIR))
+    silver_dealings = to_dealings(sales).count()
+    gold_dealings = gold.agg(F.sum("sales_count")).first()[0]
     print(f"Quarters refreshed: {len(quarters)} ({quarters[0]} to {quarters[-1]})")
-    print(f"Dealings in silver: {to_dealings(sales).count()}")
-    print(f"Dealings counted in gold: {gold.agg(F.sum('sales_count')).first()[0]}")
+    print(f"Dealings in silver: {silver_dealings}, counted in gold: {gold_dealings}")
+    if gold_dealings != silver_dealings:
+        raise RuntimeError("Gold does not reconcile with silver")
+    return {"quarters_refreshed": quarters, "dealings": silver_dealings}
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ SALES_DIR = Path("data/silver/sales")
 QUARANTINE_DIR = Path("data/silver/quarantine")
 
 
-def main() -> None:
+def main() -> dict:
     spark = get_spark()
     b, c, d = (spark.read.parquet(str(BRONZE_DIR / f"record_type={rt}")) for rt in "BCD")
 
@@ -23,15 +23,23 @@ def main() -> None:
     quarantine.write.mode("overwrite").parquet(str(QUARANTINE_DIR))
 
     total = b.count()
-    n_quarantine = spark.read.parquet(str(QUARANTINE_DIR)).count()
+    quarantined = spark.read.parquet(str(QUARANTINE_DIR))
+    n_quarantine = quarantined.count()
     n_silver = spark.read.parquet(str(SALES_DIR)).count()
-    print(f"Bronze B rows: {total}")
-    print(f"Quarantined: {n_quarantine}")
-    print(f"Silver rows: {n_silver}")
-    print(f"Duplicates removed: {total - n_quarantine - n_silver}")
-    (spark.read.parquet(str(QUARANTINE_DIR))
-     .select(F.explode("failed_rules").alias("rule"))
-     .groupBy("rule").count().orderBy("rule").show(truncate=False))
+    failed_rules = {
+        r["rule"]: r["count"]
+        for r in quarantined.select(F.explode("failed_rules").alias("rule"))
+        .groupBy("rule").count().collect()
+    }
+    stats = {
+        "bronze_sale_records": total,
+        "quarantined": n_quarantine,
+        "silver_sales": n_silver,
+        "duplicates_removed": total - n_quarantine - n_silver,
+        "failed_rules": failed_rules,
+    }
+    print(stats)
+    return stats
 
 
 if __name__ == "__main__":

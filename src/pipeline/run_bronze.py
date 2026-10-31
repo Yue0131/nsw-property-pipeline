@@ -18,11 +18,12 @@ def extract_zips(raw_dir: Path, extract_dir: Path) -> list[Path]:
     return sorted(extract_dir.rglob("*.DAT"))
 
 
-def main() -> None:
+def main() -> dict:
     ingested_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     dat_files = extract_zips(RAW_DIR, EXTRACT_DIR)
     ingested = ingest_new_files(dat_files, BRONZE_DIR, ingested_at)
     print(f"Found {len(dat_files)} .DAT files, ingested {len(ingested)} new or changed.")
+    return {"dat_files": len(dat_files), "files_ingested": len(ingested)}
 
 
 if __name__ == "__main__":
