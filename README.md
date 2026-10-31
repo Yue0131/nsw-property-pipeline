@@ -14,13 +14,47 @@
 ## Architecture
 <!-- Diagram: raw → bronze → silver → gold, with what happens at each layer. -->
 
+## Project structure
+
+```
+nsw-property-pipeline/
+├── src/pipeline/
+│   ├── parse.py          # Parse PSI .DAT files into one table per record type
+│   ├── bronze.py         # Write bronze Parquet, manifest for incremental loads
+│   ├── run_bronze.py     # Entry point: unzip weekly files and ingest to bronze
+│   ├── spark.py          # Local Spark session settings
+│   ├── silver.py         # Typing, enrichment, quality rules, deduplication
+│   └── run_silver.py     # Entry point: build silver sales and quarantine
+├── tests/                # pytest suite (made-up fixture data only)
+├── notebooks/            # Phase 1 data exploration
+├── docs/
+│   ├── data-notes.md     # Source file format and data problems found
+│   ├── decisions.md      # Design decisions and trade-offs
+│   └── problems-log.md   # Issues hit during development and fixes
+└── data/                 # Local only, not in Git (licence: CC BY-NC-ND 4.0)
+    ├── raw/              # Weekly zips from NSW Valuer General
+    ├── bronze/           # Parsed records as Parquet, all strings
+    └── silver/           # Typed, cleaned, deduplicated sales + quarantine
+```
+
 ## How to run
+Requires conda (Python 3.11 and Java 17 for PySpark 3.5).
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+conda create -n nsw-pipeline -c conda-forge python=3.11 openjdk=17
+conda activate nsw-pipeline
 pip install -r requirements.txt
 pytest -q
-# python -m pipeline run   (coming soon)
+```
+
+1. Download weekly zips in a browser from
+   `https://www.valuergeneral.nsw.gov.au/__psi/weekly/YYYYMMDD.zip` (YYYYMMDD = a Monday)
+   and put them in `data/raw/`.
+2. Build the layers:
+
+```bash
+PYTHONPATH=src python -m pipeline.run_bronze   # raw zips -> bronze Parquet
+PYTHONPATH=src python -m pipeline.run_silver   # bronze -> silver sales + quarantine
 ```
 
 ## Data quality
