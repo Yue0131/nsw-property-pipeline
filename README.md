@@ -69,12 +69,16 @@ pytest -q
 1. Download weekly zips in a browser from
    `https://www.valuergeneral.nsw.gov.au/__psi/weekly/YYYYMMDD.zip` (YYYYMMDD = a Monday)
    and put them in `data/raw/`.
-2. Build the layers:
+2. Run the whole pipeline:
 
 ```bash
-PYTHONPATH=src python -m pipeline.run_bronze   # raw zips -> bronze Parquet
-PYTHONPATH=src python -m pipeline.run_silver   # bronze -> silver sales + quarantine
+PYTHONPATH=src python -m pipeline.run
 ```
+
+This runs bronze → silver → gold and writes a run report to `data/reports/` with row counts,
+quarantine reasons and the quarters refreshed. Re-running is safe: unchanged files are skipped
+and gold only recomputes quarters touched by new data. Each layer can also be run on its own
+(`pipeline.run_bronze`, `pipeline.run_silver`, `pipeline.run_gold`).
 
 ## Data quality
 Rows that break a hard rule go to a quarantine table with the list of rules they failed,
