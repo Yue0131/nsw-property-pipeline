@@ -22,16 +22,17 @@ The NSW Valuer General publishes sales as weekly raw files, so a one-off noteboo
 
 ## Architecture
 ```
-raw (weekly zips) ──► bronze ──► silver ──► gold (coming soon)
+raw (weekly zips) ──► bronze ──► silver ──► gold
 ```
 | Layer | What happens | Output |
 | --- | --- | --- |
 | Raw | Weekly zips downloaded from NSW Valuer General | `data/raw/*.zip` |
-| Bronze | Parse `.DAT` files (record types A/B/C/D/Z), keep all values as strings, add `source_file`, `ingested_at`. Incremental: a manifest of file name + SHA-256 skips files already loaded | Parquet per record type |
+| Bronze | Parse `.DAT` files (record types A/B/C/D/Z), keep all values as strings, add `source_file`, `ingested_at` and `record_index`. Incremental: a manifest of file name + SHA-256 skips files already loaded | Parquet per record type |
 | Silver | Cast types, convert hectares to m², join legal descriptions (C) and buyer/seller counts (D), apply quality rules, deduplicate on (dealing_number, property_id, strata_lot_number) | Clean sales + quarantine |
-| Gold | Suburb × quarter volume and median price | Coming soon |
+| Gold | Collapse property rows into one row per dealing, then sales volume and median price per suburb and contract quarter. Only quarters touched by new data are recomputed | Suburb × quarter metrics |
 
 Bronze uses pandas (small files, one at a time). Silver and gold use PySpark.
+`python -m pipeline.run` runs all layers and writes a JSON run report.
 
 ## Project structure
 
@@ -40,20 +41,29 @@ nsw-property-pipeline/
 ├── src/pipeline/
 │   ├── parse.py          # Parse PSI .DAT files into one table per record type
 │   ├── bronze.py         # Write bronze Parquet, manifest for incremental loads
-│   ├── run_bronze.py     # Entry point: unzip weekly files and ingest to bronze
-│   ├── spark.py          # Local Spark session settings
 │   ├── silver.py         # Typing, enrichment, quality rules, deduplication
-│   └── run_silver.py     # Entry point: build silver sales and quarantine
+│   ├── gold.py           # Dealing-level sales, suburb x quarter metrics
+│   ├── spark.py          # Local Spark session settings
+│   ├── run_bronze.py     # Entry point: unzip weekly files and ingest to bronze
+│   ├── run_silver.py     # Entry point: build silver sales and quarantine
+│   ├── run_gold.py       # Entry point: recompute gold quarters touched by new data
+│   └── run.py            # Entry point: run all layers and save a run report
 ├── tests/                # pytest suite (made-up fixture data only)
-├── notebooks/            # Phase 1 data exploration
+├── notebooks/
+│   ├── 01_explore.ipynb  # Phase 1 data exploration
+│   └── 02_results.ipynb  # Charts used in this README
 ├── docs/
 │   ├── data-notes.md     # Source file format and data problems found
 │   ├── decisions.md      # Design decisions and trade-offs
-│   └── problems-log.md   # Issues hit during development and fixes
+│   ├── problems-log.md   # Issues hit during development and fixes
+│   └── images/           # README charts
+├── .github/workflows/    # CI: run pytest on every push
 └── data/                 # Local only, not in Git (licence: CC BY-NC-ND 4.0)
     ├── raw/              # Weekly zips from NSW Valuer General
     ├── bronze/           # Parsed records as Parquet, all strings
-    └── silver/           # Typed, cleaned, deduplicated sales + quarantine
+    ├── silver/           # Typed, cleaned, deduplicated sales + quarantine
+    ├── gold/             # Suburb x quarter metrics
+    └── reports/          # One JSON report per pipeline run
 ```
 
 ## How to run
@@ -121,4 +131,6 @@ See [docs/problems-log.md](docs/problems-log.md).
 - Only 4 weeks of data so far; deduplication and late-arrival rules need checking on more history.
 - Downloads are manual because the source blocks scripted access.
 - Silver is fully rebuilt each run; fine at this size, not for many years of data.
-- Next: gold layer, quality report per run, scheduling.
+- If a corrected file moves a sale to a different quarter, the old quarter is not refreshed
+  automatically; a full gold rebuild (delete `data/gold/`) fixes it.
+- Next: scheduling, and more history to validate the deduplication and quality rules.
