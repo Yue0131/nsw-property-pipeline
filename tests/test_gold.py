@@ -1,6 +1,6 @@
 from datetime import date
 
-from pipeline.gold import suburb_quarter_metrics, to_dealings
+from pipeline.gold import quarters_to_refresh, suburb_quarter_metrics, to_dealings
 
 SALES_SCHEMA = ("dealing_number string, purchase_price long, contract_date date, "
                 "locality string, post_code string, nature_of_property string, pct_interest int")
@@ -58,3 +58,26 @@ def test_suburbs_are_separate(spark):
     df = suburb_quarter_metrics(spark.createDataFrame(rows, DEALINGS_SCHEMA))
     counts = {r.locality: r.sales_count for r in df.collect()}
     assert counts == {"A": 1, "B": 2}
+
+LOADS_SCHEMA = "source_file string, ingested_at string, contract_date date"
+LOADS = [
+    ("a.DAT", "t1", date(2026, 1, 10)),
+    ("a.DAT", "t1", date(2025, 11, 5)),   # late-arriving sale
+    ("b.DAT", "t2", date(2026, 8, 1)),
+]
+
+
+def test_first_run_refreshes_every_quarter(spark):
+    sales = spark.createDataFrame(LOADS, LOADS_SCHEMA)
+    assert quarters_to_refresh(sales, set()) == ["2025-Q4", "2026-Q1", "2026-Q3"]
+
+
+def test_only_quarters_of_new_file_refresh(spark):
+    sales = spark.createDataFrame(LOADS, LOADS_SCHEMA)
+    assert quarters_to_refresh(sales, {("a.DAT", "t1")}) == ["2026-Q3"]
+
+
+def test_reingested_file_refreshes_its_quarters(spark):
+    sales = spark.createDataFrame(LOADS, LOADS_SCHEMA)
+    processed = {("a.DAT", "t0"), ("b.DAT", "t2")}  # a.DAT was loaded again at t1
+    assert quarters_to_refresh(sales, processed) == ["2025-Q4", "2026-Q1"]

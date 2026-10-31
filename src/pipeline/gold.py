@@ -2,6 +2,9 @@
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+def quarter_of(column: str):
+    """Quarter label like 2026-Q1 for a date column."""
+    return F.concat_ws("-Q", F.year(column), F.quarter(column))
 
 def to_dealings(sales: DataFrame) -> DataFrame:
     """Collapse silver property rows into one row per dealing.
@@ -21,7 +24,7 @@ def to_dealings(sales: DataFrame) -> DataFrame:
         )
         .withColumn(
             "contract_quarter",
-            F.concat_ws("-Q", F.year("contract_date"), F.quarter("contract_date")),
+            quarter_of("contract_date"),
         )
     )
 
@@ -48,3 +51,12 @@ def suburb_quarter_metrics(dealings: DataFrame) -> DataFrame:
         "median_price",
         F.when(F.col("median_sample_size") >= MIN_SALES_FOR_MEDIAN, F.col("median_price")),
     )
+
+def quarters_to_refresh(sales: DataFrame, processed: set[tuple[str, str]]) -> list[str]:
+    """Contract quarters touched by any (source_file, ingested_at) load not yet in gold."""
+    loads = (
+        sales.select("source_file", "ingested_at", quarter_of("contract_date").alias("quarter"))
+        .distinct()
+        .collect()
+    )
+    return sorted({r.quarter for r in loads if (r.source_file, r.ingested_at) not in processed})
