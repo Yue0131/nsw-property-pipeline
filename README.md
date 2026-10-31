@@ -1,6 +1,6 @@
 # NSW Property Sales Pipeline
 ![Tests](https://github.com/Yue0131/nsw-property-pipeline/actions/workflows/tests.yml/badge.svg)
-> Work in progress. A batch data pipeline that ingests weekly NSW property sales data, cleans and quality-checks it, and produces suburb-level quarterly price and volume metrics.
+> A batch data pipeline that ingests weekly NSW property sales data, cleans and quality-checks it, and produces suburb-level quarterly price and volume metrics.
 
 ## Problem
 How do median house prices and sales volumes change by suburb and quarter across NSW?
