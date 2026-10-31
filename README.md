@@ -85,12 +85,12 @@ The parser also checks every file's row counts against its Z trailer record.
 ## Results
 Run on 4 weekly files (28 Sep – 19 Oct 2026).
 
-[Rows through the pipeline](docs/images/pipeline_funnel.png)
+![Rows through the pipeline](docs/images/pipeline_funnel.png)
 
 Every run reconciles: bronze records = silver sales + quarantined + duplicates, and gold
 sales counts add up to the number of dealings in silver.
 
-[Contract year of sales](docs/images/late_arriving_sales.png)
+![Contract year of sales](docs/images/late_arriving_sales.png)
 
 About 12% of sales published in these weeks were contracted in earlier years, back to 2006.
 This is why gold recomputes every quarter a new file touches, not only the current one.
