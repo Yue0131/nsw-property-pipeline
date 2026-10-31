@@ -3,7 +3,16 @@
 > Work in progress. A batch data pipeline that ingests weekly NSW property sales data, cleans and quality-checks it, and produces suburb-level quarterly price and volume metrics.
 
 ## Problem
-<!-- What question does this answer, and why does it need a pipeline rather than a one-off notebook? -->
+How do median house prices and sales volumes change by suburb and quarter across NSW?
+
+The NSW Valuer General publishes sales as weekly raw files, so a one-off notebook is not enough:
+- **New files every week.** The pipeline processes only new or changed files instead of
+  starting from scratch.
+- **Late-arriving sales.** About 12% of each week's sales were contracted in earlier years,
+  so past quarters must be recomputed when new data arrives.
+- **Messy source data.** Records repeat across weeks, some have missing or impossible values,
+  and multi-property sales repeat the total price. These need consistent, tested rules.
+- **Reproducible.** Re-running gives the same result, and every run reconciles row counts.
 
 ## Data
 - Source: NSW Valuer General, [Bulk Property Sales Information](https://valuation.property.nsw.gov.au/embed/propertySalesInformation) (weekly `.DAT` files per Local Government Area, 2001 onwards; yearly files 1990–2001).
