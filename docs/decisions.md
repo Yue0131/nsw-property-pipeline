@@ -87,3 +87,23 @@ One entry per decision. Keep each short.
   partitioned by `contract_year`.
 - **Why / trade-offs:** At ~14k rows a full rebuild takes seconds and is idempotent by design.
   Deduplication needs all weeks together anyway. Revisit if data grows to many years.
+
+## 2026-10-31 — Gold: dealings, contract quarter, median rules
+- **Decision:** Gold first collapses silver property rows into one row per dealing, then
+  computes per suburb and contract quarter: `sales_count` (all dealings) and `median_price`
+  (single-property, residential, full-interest dealings only). The median is left empty when
+  fewer than 5 such sales exist; `median_sample_size` is published next to it.
+- **Why contract date:** The price is agreed at contract. Settlement is a median of 42 days
+  later and sometimes over a year, which would put prices in the wrong quarter.
+- **Why the minimum sample:** A median of one or two sales is noise, not a trend.
+
+## 2026-10-31 — Gold: recompute only quarters touched by new loads
+- **Context:** About 12% of a week's sales have a contract date in an earlier year.
+- **Decision:** Gold records the (source_file, ingested_at) loads it has used. A run finds the
+  quarters containing any sale from an unseen load and rewrites only those quarter partitions
+  (`partitionOverwriteMode = dynamic`). A re-ingested corrected file has a new ingested_at, so
+  its quarters are refreshed too.
+- **Check:** On 4 weeks: first run rewrote 35 quarters, a re-run did nothing, and a simulated
+  new load rewrote 1 quarter. Every run checks that gold sales_count adds up to the number of
+  dealings in silver (13,656).
+- **Trade-off:** Published numbers for past quarters can change when late sales arrive.
