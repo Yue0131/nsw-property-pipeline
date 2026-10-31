@@ -12,7 +12,17 @@
 - © State of New South Wales through the NSW Valuer General. The Valuer General does not guarantee the completeness or accuracy of the data.
 
 ## Architecture
-<!-- Diagram: raw → bronze → silver → gold, with what happens at each layer. -->
+```
+raw (weekly zips) ──► bronze ──► silver ──► gold (coming soon)
+```
+| Layer | What happens | Output |
+| --- | --- | --- |
+| Raw | Weekly zips downloaded from NSW Valuer General | `data/raw/*.zip` |
+| Bronze | Parse `.DAT` files (record types A/B/C/D/Z), keep all values as strings, add `source_file`, `ingested_at`. Incremental: a manifest of file name + SHA-256 skips files already loaded | Parquet per record type |
+| Silver | Cast types, convert hectares to m², join legal descriptions (C) and buyer/seller counts (D), apply quality rules, deduplicate on (dealing_number, property_id, strata_lot_number) | Clean sales + quarantine |
+| Gold | Suburb × quarter volume and median price | Coming soon |
+
+Bronze uses pandas (small files, one at a time). Silver and gold use PySpark.
 
 ## Project structure
 
@@ -58,7 +68,19 @@ PYTHONPATH=src python -m pipeline.run_silver   # bronze -> silver sales + quaran
 ```
 
 ## Data quality
-<!-- Rules, how failed records are quarantined, and a sample quality report. -->
+Rows that break a hard rule go to a quarantine table with the list of rules they failed,
+instead of being deleted. Every run must reconcile: bronze rows = silver + quarantine + duplicates.
+
+Result on 4 weeks (2026-09-28 to 2026-10-19):
+
+| Step | Rows |
+| --- | --- |
+| Bronze sales records | 14,069 |
+| Quarantined (37 missing property_id, 3 missing contract date, 2 contract before 2001) | 42 |
+| Duplicates removed (35 repeated across weeks, 8 written twice in one file) | 43 |
+| Silver sales | 13,984 |
+
+The parser also checks every file's row counts against its Z trailer record.
 
 ## Results
 <!-- 2–3 charts you made from the gold layer. -->
@@ -70,4 +92,7 @@ See [docs/decisions.md](docs/decisions.md).
 See [docs/problems-log.md](docs/problems-log.md).
 
 ## Limitations and next steps
-<!-- Be honest: what this does not handle yet. -->
+- Only 4 weeks of data so far; deduplication and late-arrival rules need checking on more history.
+- Downloads are manual because the source blocks scripted access.
+- Silver is fully rebuilt each run; fine at this size, not for many years of data.
+- Next: gold layer, quality report per run, scheduling.
